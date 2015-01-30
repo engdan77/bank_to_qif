@@ -1,9 +1,7 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
 
-import argparse
-
-__version__ = "$Revision: 20150127.8"
+__version__ = "$Revision: 20150130.40"
 
 dictCatBankDesc = {'Expenses:Car:Parking': ['Solna Stad'],
                    'Expenses:Work:Unemployment Fund': ['.*UNIONEN.*'],
@@ -141,7 +139,7 @@ def checkInExisting(existingFile, date, amount):
 
 def addToExisting(existingFile, date, description, bankCategory, amount):
     ''' Adding a record to the existing file '''
-    existingFile.write("%s;%s;%s;%s\n" % (date, description, bankCategory, amount))
+    existingFile.write("%s;%s;%s;%s\n" % (date, description.encode('ascii', 'ignore'), bankCategory, amount))
 
 
 def convertListByCat(bankList, dictCatBankDec, dictCatBankCat, **args):
@@ -150,7 +148,6 @@ def convertListByCat(bankList, dictCatBankDec, dictCatBankCat, **args):
     from datetime import datetime
 
     uncat = args.get('uncat', 'Expenses:Uncategorized')
-    existing = args.get('existing', None)
     verbose = args.get('verbose', False)
 
     result = []
@@ -198,6 +195,25 @@ def convertListByCat(bankList, dictCatBankDec, dictCatBankCat, **args):
     return result
 
 
+def createQifHeader(output, account):
+    ''' Function to create QIF Header '''
+    output.write('!Account\n')
+    output.write("N%s\n" % args.account)
+    output.write('TBank\n')
+    output.write('^\n')
+
+
+def addQifRecord(output, date, description, category, amount):
+    ''' Function to create QIF file '''
+    description = description.encode('ascii', 'ignore')
+    output.write('!Type:Bank\n')
+    output.write('D%s\n' % date)
+    output.write('P%s\n' % description)
+    output.write('T%s\n' % amount)
+    output.write('L%s\n' % category)
+    output.write('^')
+
+
 if __name__ == "__main__":
     ''' Main function '''
     import argparse
@@ -207,6 +223,7 @@ if __name__ == "__main__":
     parser.add_argument('input', metavar='file.xls', help="Input file to parse (Skandiabanken xls-file)", type=argparse.FileType('r'))
     parser.add_argument('output', metavar='file.qif', help="Output qif file", type=argparse.FileType('w'))
     parser.add_argument('--existing', metavar='file.csv', help="Create/Update/Read CSV file to only create qif of new changes", type=argparse.FileType('a+'))
+    parser.add_argument('--account', metavar='Default_Qif_Account', help="The BankAccount to associate QIF output to", default='Assets:Current Assets:Checking account')
     parser.add_argument('--verbose', help="Verbose mode", action='store_true')
     args = parser.parse_args()
 
@@ -217,18 +234,33 @@ if __name__ == "__main__":
 
     row_no = 0
     existing_no = 0
-    for row in skandiaList:
-        row_no += 1
-        date, description, category, amount = row
-        # Check if row exist in existingfile and if not true
-        if not checkInExisting(args.existing, date, amount):
-            if args.verbose:
-                print "Adding record to existing: %s, %s, %s" % (date, description, amount)
-            existing_no += 1
-            addToExisting(args.existing, date, description.encode('ascii', 'ignore'), category, amount)
 
-    print "Processed %s in %s, added %s to %s" % (row_no, args.input.name, existing_no, args.existing.name)
+    if args.input and args.output:
+        # Adding header to output
+        createQifHeader(args.output, args.account)
+
+        # Parse through all records in input
+        for row in skandiaList:
+            row_no += 1
+            date, description, category, amount = row
+            # Check if row exist in existingfile and if not true
+            if not checkInExisting(args.existing, date, amount):
+                if args.verbose:
+                    print "Adding record to existing: %s, %s, %s" % (date, description, amount)
+                existing_no += 1
+                # Adding record to existing
+                addToExisting(args.existing, date, description, category, amount)
+                # Add record to QIF output
+                addQifRecord(args.output, date, description, category, amount)
+            else:
+                if args.verbose:
+                    print "Already or duplicate record in %s: %s" % (args.existing.name, row)
+        print "Processed %s records in %s, added %s to %s" % (row_no, args.input.name, existing_no, args.existing.name)
 
     if args.existing:
         args.existing.close()
+    if args.output:
+        args.output.close()
+    if args.input:
+        args.input.close()
     # print skandiaList
