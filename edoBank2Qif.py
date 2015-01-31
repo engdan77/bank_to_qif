@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
 
-__version__ = "$Revision: 20150130.40"
+__version__ = "$Revision: 20150131.62"
 
 dictCatBankDesc = {'Expenses:Car:Parking': ['Solna Stad'],
                    'Expenses:Work:Unemployment Fund': ['.*UNIONEN.*'],
@@ -10,9 +10,11 @@ dictCatBankDesc = {'Expenses:Car:Parking': ['Solna Stad'],
                    'Expenses:Home:Computer Services': ['.*spideroak.*', '.*Evernote.*', '.*City Network.*', '.*iPeer.*', '.*JibJab.*'],
                    'Expenses:Health:Gym': ['.*Fitness 24.*'],
                    'Expenses:Health:Eye': ['.*Synsam.*'],
-                   'Expenses:Car:Insurance': ['.*Falck.*'],
-                   'Expenses:Car:Insurance': ['.*Bilf.rs.kring.*'],
-                   'Assets:Current Assets:Savings Account:': ['.*besparing.*', '.*spara.*'],
+                   'Expenses:Car:Insurance': ['.*Falck.*', '.*Bilf.rs.kring.*'],
+                   'Assets:Current Assets:Savings Account': ['.*besparing.*', '.*spara.*', '.*verf. 9159.*', '.*R.NTEKONTO*'],
+                   'Expenses:Entertainment:Magazines': ['.*Datormagazin.*'],
+                   'Expenses:Credit Card': ['.*eurocard.*'],
+                   'Income:Salary': ['L.n', '.*salary.*', '.*\(\)\d{9}.*', 'LN.*'],
                    'Expenses:Boat:Fees': ['.*Marinpool.*']}
 
 dictCatBankCat = {'Assets:Current Assets:Retirement Savings': ['Pensionsparande'],
@@ -31,17 +33,16 @@ dictCatBankCat = {'Assets:Current Assets:Retirement Savings': ['Pensionsparande'
                   'Expenses:Home:Electric': ['El och v.rme'],
                   'Expenses:Home:Rent': ['Hyra', 'Boendeavgifter'],
                   'Expenses:Home:Services': ['Tv, telefoni och internet'],
-                  'Expenses:Income:Insurance': ['Inkomstf.rs.kring'],
+                  'Expenses:Work:Income Insurance': ['Inkomstf.rs.kring'],
                   'Expenses:Interest:Mortgage Interest': ['Bol.n'],
-                  'Expenses:Medical Expenses:Eye': ['Syn och h.rsel'],
-                  'Expenses:Medical Expenses:Misc': ['L.kare, sjukv.rd, tandl.kare', 'Medicin'],
+                  'Expenses:Helth:Eye': ['Syn och h.rsel'],
+                  'Expenses:Health:Misc': ['L.kare, sjukv.rd, tandl.kare', 'Medicin'],
                   'Expenses:Public Transportation': ['Flyg, hyrbil och semestertransport', 'Taxi'],
                   'Expenses:Uncategorized': ['.vrigt: Okategoriserade utgifter', 'Uttagsautomat', 'Hotel och .vernattning', '.vrigt: Boende och hush.ll', '.vrigt: Shopping och service', 'M.bler och interi.r', 'Renovering och underh.ll', 'Bio, teater, konserter etc', 'Hobby', 'Nattklubb, dansst.lle, bar', 'Skidor och vintersport', 'Liv- och sjukf.rs.kring', 'G.vor', 'B.cker och spel', 'Smycken', 'Tr.dg.rd', 'K.p av konst', 'N.jen under semester', 'Prenumerationer och tidningar', '.vrigt: Restauranger och n.jen', 'Film, DVD etc', 'Tobak, snus, cigaretter etc', 'Leksaker', 'Kollektivtrafik', 'Bankavgifter', 'Bageri', '.vrigt: Fritid', 'Kiosker, glassbarer etc', 'Musik och instrument', 'Skol- och fritidshemavgifter', '.vrigt: Mat', 'Hemf.rs.kring', 'Sk.nhetsprodukter', 'Kosttillskott och vitaminer', 'Kurslitteratur och kontorsvaror', 'F.reningsliv', '.verf.ring mellan egna konton'],
                   'Expenses:Work:Unemployment Fund': ['A-Kassa'],
                   'Income:Other Income': ['.vrigt: Utl.gg och .terbetalda utl.gg', 'Okategoriserad inkomst'],
-                  'Income:Salary': ['L.n'],
                   'Income:Tax Refund': ['Skatte.terb.ring'],
-                  'Liabilities:Credit Card': ['Avbetalning konsumtionsl.n']}
+                  'Expenses:Credit Card': ['Avbetalning konsumtionsl.n']}
 
 
 def cleanSkandiaExcelXML(filename, output):
@@ -180,7 +181,7 @@ def convertListByCat(bankList, dictCatBankDec, dictCatBankCat, **args):
                     # Found match replace/assign category
                     bankCategory = category
                     if verbose:
-                        print "Found match of Category for %s - updated record |%s|%s|%s|%s|" % (expression, description, bankCategory, date, amount)
+                        print "Found match of Category for %s - updated record |%s|%s|%s|%s|" % (expression, description.encode('ascii', 'ignore'), bankCategory, date, amount)
 
         # Second check for matching of description
         for category, expressions in dictCatBankDec.items():
@@ -190,7 +191,7 @@ def convertListByCat(bankList, dictCatBankDec, dictCatBankCat, **args):
                     # Found match replace/assign category
                     bankCategory = category
                     if verbose:
-                        print "Found match in description for %s - updated record |%s|%s|%s|%s|" % (expression, description, bankCategory, date, amount)
+                        print "Found match in description for %s - updated record |%s|%s|%s|%s|" % (expression, description.encode('ascii', 'ignore'), bankCategory, date, amount)
         result.append((date, description, bankCategory, amount))
     return result
 
@@ -211,7 +212,7 @@ def addQifRecord(output, date, description, category, amount):
     output.write('P%s\n' % description)
     output.write('T%s\n' % amount)
     output.write('L%s\n' % category)
-    output.write('^')
+    output.write('^\n')
 
 
 if __name__ == "__main__":
@@ -234,6 +235,7 @@ if __name__ == "__main__":
 
     row_no = 0
     existing_no = 0
+    duplicate_sum = 0
 
     if args.input and args.output:
         # Adding header to output
@@ -246,7 +248,7 @@ if __name__ == "__main__":
             # Check if row exist in existingfile and if not true
             if not checkInExisting(args.existing, date, amount):
                 if args.verbose:
-                    print "Adding record to existing: %s, %s, %s" % (date, description, amount)
+                    print "Adding record to existing: %s, %s, %s" % (date, description.encode('ascii', 'ignore'), amount)
                 existing_no += 1
                 # Adding record to existing
                 addToExisting(args.existing, date, description, category, amount)
@@ -255,7 +257,9 @@ if __name__ == "__main__":
             else:
                 if args.verbose:
                     print "Already or duplicate record in %s: %s" % (args.existing.name, row)
+                duplicate_sum += int(amount)
         print "Processed %s records in %s, added %s to %s" % (row_no, args.input.name, existing_no, args.existing.name)
+        print "Total summary of duplicates: %s" % (duplicate_sum,)
 
     if args.existing:
         args.existing.close()
