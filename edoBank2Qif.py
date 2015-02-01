@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
 
-__version__ = "$Revision: 20150131.62"
+__version__ = "$Revision: 20150201.92"
 
 dictCatBankDesc = {'Expenses:Car:Parking': ['Solna Stad'],
                    'Expenses:Work:Unemployment Fund': ['.*UNIONEN.*'],
                    'Expenses:Home:Services': ['.*Netflix.*'],
                    'Expenses:Home:Home Insurance': ['.*Hemf.rs.kring.*'],
+                   'Expenses:Home:Mortgage Loan': ['.*VERFRING \d{11}.*', 'L.neavi\s\d+'],
                    'Expenses:Home:Computer Services': ['.*spideroak.*', '.*Evernote.*', '.*City Network.*', '.*iPeer.*', '.*JibJab.*'],
                    'Expenses:Health:Gym': ['.*Fitness 24.*'],
                    'Expenses:Health:Eye': ['.*Synsam.*'],
@@ -14,7 +15,8 @@ dictCatBankDesc = {'Expenses:Car:Parking': ['Solna Stad'],
                    'Assets:Current Assets:Savings Account': ['.*besparing.*', '.*spara.*', '.*verf. 9159.*', '.*R.NTEKONTO*'],
                    'Expenses:Entertainment:Magazines': ['.*Datormagazin.*'],
                    'Expenses:Credit Card': ['.*eurocard.*'],
-                   'Income:Salary': ['L.n', '.*salary.*', '.*\(\)\d{9}.*', 'LN.*'],
+                   'Income:Salary': ['^L.n\b', '.*salary.*', '.*\(\)\d{9}.*', 'LN.*', '.*T\sL.N$'],
+                   'Expenses:Uncategorized': ['.*Paypal.*'],
                    'Expenses:Boat:Fees': ['.*Marinpool.*']}
 
 dictCatBankCat = {'Assets:Current Assets:Retirement Savings': ['Pensionsparande'],
@@ -173,25 +175,34 @@ def convertListByCat(bankList, dictCatBankDec, dictCatBankCat, **args):
         else:
             print "Wrong date format: %s" % (str(transaction))
 
-        # First check if matching of category is found
-        for category, expressions in dictCatBankCat.items():
-            for expression in expressions:
-                # Check if expression match with description
-                if re.match(expression, bankCategory, flags=re.IGNORECASE):
-                    # Found match replace/assign category
-                    bankCategory = category
-                    if verbose:
-                        print "Found match of Category for %s - updated record |%s|%s|%s|%s|" % (expression, description.encode('ascii', 'ignore'), bankCategory, date, amount)
+        cat_found = False
 
         # Second check for matching of description
         for category, expressions in dictCatBankDec.items():
             for expression in expressions:
                 # Check if expression match with description
-                if re.match(expression, description, flags=re.IGNORECASE):
+                if re.match(expression, description, flags=re.IGNORECASE) and not cat_found:
                     # Found match replace/assign category
                     bankCategory = category
+                    cat_found = True
                     if verbose:
                         print "Found match in description for %s - updated record |%s|%s|%s|%s|" % (expression, description.encode('ascii', 'ignore'), bankCategory, date, amount)
+
+        # First check if matching of category is found
+        for category, expressions in dictCatBankCat.items():
+            for expression in expressions:
+                # Check if expression match with description
+                if re.match(expression, bankCategory, flags=re.IGNORECASE) and not cat_found:
+                    # Found match replace/assign category
+                    bankCategory = category
+                    cat_found = True
+                    if verbose:
+                        print "Found match of Category for %s - updated record |%s|%s|%s|%s|" % (expression, description.encode('ascii', 'ignore'), bankCategory, date, amount)
+
+        # If not catefories found
+        if not cat_found:
+                bankCategory = uncat
+
         result.append((date, description, bankCategory, amount))
     return result
 
@@ -248,7 +259,7 @@ if __name__ == "__main__":
             # Check if row exist in existingfile and if not true
             if not checkInExisting(args.existing, date, amount):
                 if args.verbose:
-                    print "Adding record to existing: %s, %s, %s" % (date, description.encode('ascii', 'ignore'), amount)
+                    print "Adding record to existing: %s, %s, %s, %s" % (date, description.encode('ascii', 'ignore'), amount, category)
                 existing_no += 1
                 # Adding record to existing
                 addToExisting(args.existing, date, description, category, amount)
