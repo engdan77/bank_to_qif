@@ -1,4 +1,4 @@
-# edoBank2Qif
+# bank_to_qif
 
 Program to process XML/XLS and generate QIF-format supported by e.g. GnuCash
 
@@ -7,7 +7,7 @@ Command Line Argument
 ---------------------
 
 ```
-usage: edoBank2Qif.py [-h] [--existing file.csv] [--verbose] file.xls file.qif
+usage: bank_to_qif.py [-h] [--existing file.csv] [--verbose] file.xls file.qif
 
 Tool to parse bank-exports into qif-format supported by GnuCash
 
